@@ -3,6 +3,8 @@ import torch
 import numpy as np
 import supervision as sv
 import mediapipe as mp
+import sys
+sys.path.append("GroundingDINO")
 from groundingdino.util.inference import Model
 from sklearn.cluster import KMeans
 from scipy.ndimage import gaussian_filter
@@ -13,7 +15,7 @@ from scipy.ndimage import gaussian_filter
 UZBEK_TEXT = {
     "loading_model": "Asosiy va yuzni aniqlash modellari yuklanmoqda...",
     "model_loaded": "Modellar muvaffaqiyatli yuklandi.",
-    "video_not_found": "Xatolik: 'demo_video.mp4' video fayli topilmadi.",
+    "video_not_found": "Xatolik: 'test.mp4' video fayli topilmadi.",
     "processing_frame": "Kadr {} ishlanmoqda...",
     "detected_people": "Aniqlangan odamlar soni: {}",
     "detected_shoes": "Aniqlangan poyabzallar soni: {}",
@@ -37,8 +39,8 @@ UZBEK_TEXT = {
 # =================================================================================
 # SOZLAMALAR
 # =================================================================================
-GROUNDING_DINO_CONFIG_PATH = "groundingdino/config/GroundingDINO_SwinT_OGC.py"
-GROUNDING_DINO_CHECKPOINT_PATH = "weights/groundingdino_swint_ogc.pth"
+GROUNDING_DINO_CONFIG_PATH = "/home/bekhzod/Desktop/VideoDetection/GroundingDINO/groundingdino/config/GroundingDINO_SwinT_OGC.py"
+GROUNDING_DINO_CHECKPOINT_PATH = "/home/bekhzod/Desktop/VideoDetection/GroundingDINO/weights/groundingdino_swint_ogc.pth"
 CLASSES = ["person", "shoes"]
 BOX_TRESHOLD = 0.35
 TEXT_TRESHOLD = 0.25
@@ -106,7 +108,7 @@ def main():
     g_dino_model, face_detector = load_models()
     
     # 2. Videoni ochish
-    cap = cv2.VideoCapture("demo_video.mp4")
+    cap = cv2.VideoCapture("test.mp4")
     if not cap.isOpened():
         print(UZBEK_TEXT["video_not_found"])
         return
