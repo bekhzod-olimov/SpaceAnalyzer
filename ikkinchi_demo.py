@@ -139,6 +139,9 @@ def main():
                     frame[y:y+h, x:x+w] = blurred_face
 
         # 4. Asosiy ob'ektlarni aniqlash
+        print(len(g_dino_model.predict_with_classes(
+            image=frame, classes=CLASSES, box_threshold=BOX_TRESHOLD, text_threshold=TEXT_TRESHOLD
+        )))
         detections, labels = g_dino_model.predict_with_classes(
             image=frame, classes=CLASSES, box_threshold=BOX_TRESHOLD, text_threshold=TEXT_TRESHOLD
         )

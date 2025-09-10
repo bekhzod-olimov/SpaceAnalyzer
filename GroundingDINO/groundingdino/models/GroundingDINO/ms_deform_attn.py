@@ -327,7 +327,34 @@ class MultiScaleDeformableAttention(nn.Module):
                 )
             )
     
-        if torch.cuda.is_available() and value.is_cuda:
+        # if torch.cuda.is_available() and value.is_cuda:
+        #     halffloat = False
+        #     if value.dtype == torch.float16:
+        #         halffloat = True
+        #         value = value.float()
+        #         sampling_locations = sampling_locations.float()
+        #         attention_weights = attention_weights.float()
+
+        #     output = MultiScaleDeformableAttnFunction.apply(
+        #         value,
+        #         spatial_shapes,
+        #         level_start_index,
+        #         sampling_locations,
+        #         attention_weights,
+        #         self.im2col_step,
+        #     )
+
+        #     if halffloat:
+        #         output = output.half()
+        # else:
+        #     output = multi_scale_deformable_attn_pytorch(
+        #         value, spatial_shapes, sampling_locations, attention_weights
+        #     )
+
+        # output = self.output_proj(output)
+
+        if not torch.cuda.is_available():        
+            print(f"With GPU -> {torch.cuda.is_available() and value.is_cuda}")
             halffloat = False
             if value.dtype == torch.float16:
                 halffloat = True
@@ -347,6 +374,7 @@ class MultiScaleDeformableAttention(nn.Module):
             if halffloat:
                 output = output.half()
         else:
+            # print(f"No GPU -> {torch.cuda.is_available() and value.is_cuda}")
             output = multi_scale_deformable_attn_pytorch(
                 value, spatial_shapes, sampling_locations, attention_weights
             )
