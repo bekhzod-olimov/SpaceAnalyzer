@@ -4,3 +4,5 @@ mediapipe
 supervision
 transformers
 scikit-learn
+retina-face
+tf-keras
