@@ -20,10 +20,9 @@ UZBEK_TEXT = {
     "detected_total_people": "Jami odamlar: {}",
     "detected_men": "Erkaklar: {}", "detected_women": "Ayollar: {}", "detected_kids": "Bolalar: {}",
     "detected_shoes": "Sotuvdagi poyabzallar: {}",
-    "density": "Zichlik: {:.2f} kishi/m²",
+    "density": "Zichlik: {:.2f} kishi/metr kv",
     "crowding_level": "Tirbandlik darajasi: {}",
     "low": "Past", "medium": "O'rtacha", "high": "Yuqori",
-    "alert": "DIQQAT: '{}' hududida tirbandlik yuqori!",
     "heatmap_saved": "Faollik xaritasi 'heatmap.jpg' fayliga saqlandi.",
     "colors": {
         "qizil": ([0, 120, 70], [10, 255, 255]), "yashil": ([36, 100, 100], [86, 255, 255]),
@@ -39,18 +38,12 @@ UZBEK_TEXT = {
 GROUNDING_DINO_CONFIG_PATH = "/home/bekhzod/Desktop/VideoDetection/GroundingDINO/groundingdino/config/GroundingDINO_SwinT_OGC.py"
 GROUNDING_DINO_CHECKPOINT_PATH = "/home/bekhzod/Desktop/VideoDetection/GroundingDINO/weights/groundingdino_swint_ogc.pth"
 CLASSES = ["man", "woman", "kid", "shoes"]
+DENSITY_THRESHOLDS = {"high": 0.5, "medium": 0.2}
 BOX_TRESHOLD = 0.2
 TEXT_TRESHOLD = 0.2
 STORE_AREA_SQ_METERS = 50.0
-DENSITY_THRESHOLDS = {"high": 0.5, "medium": 0.2}
-HIGH_DENSITY_ALERT_ZONE = (350, 150, 750, 600)
 PIXELATION_FACTOR = 30 
-
-# *** Poyabzal Zonalari (O'ng tokcha to'g'rilandi) ***
-SHOE_ZONES = {
-    "chap tokcha": {"coords": (0, 200, 350, 900), "color": (255, 165, 0)}, 
-    "o'ng tokcha": {"coords": (800, 350, 1920, 520), "color": (0, 128, 255)} 
-}
+ZONE_PADDING = 20 # Dinamik zonalarga qo'shiladigan bo'sh joy
 
 # =================================================================================
 # YORDAMCHI FUNKSIYALAR
@@ -96,6 +89,33 @@ def pixelate_face(face_roi):
     temp = cv2.resize(face_roi, (w_px, h_px), interpolation=cv2.INTER_LINEAR)
     return cv2.resize(temp, (w, h), interpolation=cv2.INTER_NEAREST)
 
+# *** DINAMIK ZONALARNI YARATISH UCHUN YANGI FUNKSIYA ***
+def create_dynamic_zones(shoe_detections, frame_width):
+    if len(shoe_detections) == 0:
+        return {}
+
+    zones = {}
+    frame_center_x = frame_width / 2
+    
+    left_shoes = shoe_detections[(shoe_detections.xyxy[:, 0] + shoe_detections.xyxy[:, 2]) / 2 < frame_center_x]
+    right_shoes = shoe_detections[(shoe_detections.xyxy[:, 0] + shoe_detections.xyxy[:, 2]) / 2 >= frame_center_x]
+
+    if len(left_shoes) > 0:
+        x1 = np.min(left_shoes.xyxy[:, 0]) - ZONE_PADDING
+        y1 = np.min(left_shoes.xyxy[:, 1]) - ZONE_PADDING
+        x2 = np.max(left_shoes.xyxy[:, 2]) + ZONE_PADDING
+        y2 = np.max(left_shoes.xyxy[:, 3]) + ZONE_PADDING
+        zones["chap qator"] = {"coords": (int(x1), int(y1), int(x2), int(y2)), "color": (255, 165, 0)}
+
+    if len(right_shoes) > 0:
+        x1 = np.min(right_shoes.xyxy[:, 0]) - ZONE_PADDING
+        y1 = np.min(right_shoes.xyxy[:, 1]) - ZONE_PADDING
+        x2 = np.max(right_shoes.xyxy[:, 2]) + ZONE_PADDING
+        y2 = np.max(right_shoes.xyxy[:, 3]) + ZONE_PADDING
+        zones["o'ng qator"] = {"coords": (int(x1), int(y1), int(x2), int(y2)), "color": (0, 128, 255)}
+        
+    return zones
+
 # =================================================================================
 # ASOSIY FUNKSIYA
 # =================================================================================
@@ -109,6 +129,8 @@ def main():
     box_annotator = sv.BoxAnnotator()
     label_annotator = sv.LabelAnnotator()
     heatmap_points = []
+    
+    frame_width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
     
     frame_count = 0
     while True:
@@ -129,19 +151,18 @@ def main():
         if len(people_indices) > 0 and len(shoe_indices) > 0:
             for shoe_idx in shoe_indices:
                 shoe_box = all_detections.xyxy[shoe_idx]
-                shoe_center_x = (shoe_box[0] + shoe_box[2]) / 2
                 shoe_center_y = (shoe_box[1] + shoe_box[3]) / 2
-                
                 for person_idx in people_indices:
                     person_box = all_detections.xyxy[person_idx]
-                    person_center_y = (person_box[1] + person_box[3]) / 2
-                    is_contained = person_box[0] < shoe_center_x < person_box[2] and person_box[1] < shoe_center_y < person_box[3]
-                    is_low_on_body = shoe_center_y > person_center_y
-                    if is_contained and is_low_on_body:
+                    if person_box[0] < (shoe_box[0] + shoe_box[2]) / 2 < person_box[2] and \
+                       person_box[1] < shoe_center_y < person_box[3] and \
+                       shoe_center_y > (person_box[1] + person_box[3]) / 2:
                         worn_shoe_indices.add(shoe_idx)
                         break
         
         for_sale_shoe_indices = [i for i in shoe_indices if i not in worn_shoe_indices]
+        for_sale_shoe_detections = all_detections[for_sale_shoe_indices]
+        
         final_indices = people_indices + for_sale_shoe_indices
         final_detections = all_detections[final_indices]
         
@@ -170,8 +191,10 @@ def main():
                         annotated_frame[y1:y2, x1:x2] = pixelated_face
         except Exception as e:
             pass
-        
-        for zone_name, zone_info in SHOE_ZONES.items():
+            
+        # *** DINAMIK ZONALARNI CHIZISH ***
+        dynamic_zones = create_dynamic_zones(for_sale_shoe_detections, frame_width)
+        for zone_name, zone_info in dynamic_zones.items():
             coords, color = zone_info["coords"], zone_info["color"]
             x1, y1, x2, y2 = coords
             cv2.rectangle(annotated_frame, (x1, y1), (x2, y2), color, 2)
@@ -182,7 +205,7 @@ def main():
         kids_count = sum(1 for cid in final_detections.class_id if CLASSES[cid] == "kid")
         shoes_count = sum(1 for cid in final_detections.class_id if CLASSES[cid] == "shoes")
         total_people_count = men_count + women_count + kids_count
-        density = total_people_count / STORE_AREA_SQ_METERS
+        density = total_people_count / STORE_AREA_SQ_METERS if STORE_AREA_SQ_METERS > 0 else 0
         crowding_level = UZBEK_TEXT["low"]
         if density >= DENSITY_THRESHOLDS["high"]: crowding_level = UZBEK_TEXT["high"]
         elif density >= DENSITY_THRESHOLDS["medium"]: crowding_level = UZBEK_TEXT["medium"]
@@ -200,23 +223,7 @@ def main():
             cv2.putText(annotated_frame, text, (10, y_pos), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 0), 2, cv2.LINE_AA)
             y_pos += 40
         
-        zx1, zy1, zx2, zy2 = HIGH_DENSITY_ALERT_ZONE
-        cv2.rectangle(annotated_frame, (zx1, zy1), (zx2, zy2), (0, 0, 255), 2)
-        zone_people = 0
-        
-        for i, (detection, class_id) in enumerate(zip(final_detections.xyxy, final_detections.class_id)):
-            if CLASSES[class_id] in people_classes_en:
-                center_x, center_y = (detection[0] + detection[2]) / 2, (detection[1] + detection[3]) / 2
-                heatmap_points.append((int(center_x), int(center_y)))
-                if zx1 < center_x < zx2 and zy1 < center_y < zy2: zone_people += 1
-        
-        zone_area = ((zx2 - zx1) * (zy2 - zy1)) / (frame.shape[1] * frame.shape[0]) * STORE_AREA_SQ_METERS
-        zone_density = zone_people / zone_area if zone_area > 0 else 0
-        if zone_density >= DENSITY_THRESHOLDS["high"]:
-            alert_text = UZBEK_TEXT["alert"].format("Asosiy")
-            cv2.putText(annotated_frame, alert_text, (zx1, zy1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 0, 255), 2, cv2.LINE_AA)
-        
-        cv2.imshow("High-Accuracy Privacy Demo", annotated_frame)
+        cv2.imshow("Dynamic Store Analytics", annotated_frame)
         if cv2.waitKey(1) & 0xFF == ord('q'): break
 
     cap.release()
