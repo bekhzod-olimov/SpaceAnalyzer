@@ -10,18 +10,16 @@ from sklearn.cluster import KMeans
 from scipy.ndimage import gaussian_filter
 
 # =================================================================================
-# O'ZBEK TILI UCHUN MATNLAR (YANGILANGAN)
+# O'ZBEK TILI UCHUN MATNLAR
 # =================================================================================
 UZBEK_TEXT = {
     "loading_model": "Asosiy model yuklanmoqda...",
     "model_loaded": "Model muvaffaqiyatli yuklandi.",
     "video_not_found": "Xatolik: 'test.mp4' video fayli topilmadi.",
     "processing_frame": "Kadr {} ishlanmoqda...",
-    "detected_total_people": "Jami odamlar: {}", # Yangi
-    "detected_men": "Erkaklar: {}", # Yangi
-    "detected_women": "Ayollar: {}", # Yangi
-    "detected_kids": "Bolalar: {}", # Yangi
-    "detected_shoes": "Poyabzallar: {}",
+    "detected_total_people": "Jami odamlar: {}",
+    "detected_men": "Erkaklar: {}", "detected_women": "Ayollar: {}", "detected_kids": "Bolalar: {}",
+    "detected_shoes": "Sotuvdagi poyabzallar: {}",
     "density": "Zichlik: {:.2f} kishi/m²",
     "crowding_level": "Tirbandlik darajasi: {}",
     "low": "Past", "medium": "O'rtacha", "high": "Yuqori",
@@ -32,21 +30,14 @@ UZBEK_TEXT = {
         "ko'k": ([94, 80, 2], [126, 255, 255]), "qora": ([0, 0, 0], [180, 255, 30]),
         "oq": ([0, 0, 200], [180, 20, 255]), "kulrang": ([0, 0, 40], [180, 20, 200])
     },
-    # O'zbekcha klass nomlari
-    "class_names": {
-        "man": "erkak",
-        "woman": "ayol",
-        "kid": "bola",
-        "shoes": "poyabzal"
-    }
+    "class_names": { "man": "erkak", "woman": "ayol", "kid": "bola", "shoes": "poyabzal" }
 }
 
 # =================================================================================
-# SOZLAMALAR (YANGILANGAN)
+# SOZLAMALAR
 # =================================================================================
 GROUNDING_DINO_CONFIG_PATH = "/home/bekhzod/Desktop/VideoDetection/GroundingDINO/groundingdino/config/GroundingDINO_SwinT_OGC.py"
 GROUNDING_DINO_CHECKPOINT_PATH = "/home/bekhzod/Desktop/VideoDetection/GroundingDINO/weights/groundingdino_swint_ogc.pth"
-# *** KLASSLAR RO'YXATI YANGILANDI ***
 CLASSES = ["man", "woman", "kid", "shoes"]
 BOX_TRESHOLD = 0.35
 TEXT_TRESHOLD = 0.25
@@ -54,19 +45,18 @@ STORE_AREA_SQ_METERS = 50.0
 DENSITY_THRESHOLDS = {"high": 0.5, "medium": 0.2}
 HIGH_DENSITY_ALERT_ZONE = (100, 200, 600, 500)
 PIXELATION_FACTOR = 30 
+IOU_THRESHOLD_FOR_WORN_SHOES = 0.05
 
 # =================================================================================
-# YORDAMCHI FUNKSIYALAR (O'zgarishsiz)
+# YORDAMCHI FUNKSIYALAR
 # =================================================================================
 def load_g_dino_model():
-    # ... (o'zgarishsiz)
     print(UZBEK_TEXT["loading_model"])
     g_dino_model = Model(model_config_path=GROUNDING_DINO_CONFIG_PATH, model_checkpoint_path=GROUNDING_DINO_CHECKPOINT_PATH)
     print(UZBEK_TEXT["model_loaded"])
     return g_dino_model
 
 def get_dominant_color(image, k=3):
-    # ... (o'zgarishsiz)
     if image.size == 0: return ""
     pixels = image.reshape(-1, 3); pixels = np.float32(pixels)
     criteria = (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 10, 1.0)
@@ -83,7 +73,6 @@ def get_dominant_color(image, k=3):
     return closest_color_name if min_dist < 40 else ""
 
 def create_heatmap(background_image, points):
-    # ... (o'zgarishsiz)
     height, width, _ = background_image.shape
     density_map = np.zeros((height, width), dtype=np.float32)
     for x, y in points:
@@ -97,14 +86,13 @@ def create_heatmap(background_image, points):
     cv2.imwrite("heatmap.jpg", superimposed_img)
 
 def pixelate_face(face_roi):
-    # ... (o'zgarishsiz)
     (h, w) = face_roi.shape[:2]
     w_px, h_px = max(1, w // PIXELATION_FACTOR), max(1, h // PIXELATION_FACTOR)
     temp = cv2.resize(face_roi, (w_px, h_px), interpolation=cv2.INTER_LINEAR)
     return cv2.resize(temp, (w, h), interpolation=cv2.INTER_NEAREST)
 
 # =================================================================================
-# ASOSIY FUNKSIYA (YANGILANGAN MANTIQ BILAN)
+# ASOSIY FUNKSIYA
 # =================================================================================
 def main():
     g_dino_model = load_g_dino_model()
@@ -124,25 +112,38 @@ def main():
         frame_count += 1
         print(UZBEK_TEXT["processing_frame"].format(frame_count), end='\r')
 
-        detections = g_dino_model.predict_with_classes(
+        all_detections = g_dino_model.predict_with_classes(
             image=frame, classes=CLASSES, box_threshold=BOX_TRESHOLD, text_threshold=TEXT_TRESHOLD
         )
 
+        # *** XATO TO'G'RILANGAN QISM: Kiyilgan poyabzallarni filtrlash ***
+        people_classes_ids = [i for i, name in enumerate(CLASSES) if name in {"man", "woman", "kid"}]
+        shoes_class_id = CLASSES.index("shoes") if "shoes" in CLASSES else -1
+
+        people_detections = all_detections[np.isin(all_detections.class_id, people_classes_ids)]
+        shoe_detections = all_detections[all_detections.class_id == shoes_class_id]
+
+        worn_shoe_mask = np.zeros(len(shoe_detections), dtype=bool)
+        if len(people_detections) > 0 and len(shoe_detections) > 0:
+            iou_matrix = sv.box_iou_batch(shoe_detections.xyxy, people_detections.xyxy)
+            worn_shoe_mask = np.any(iou_matrix > IOU_THRESHOLD_FOR_WORN_SHOES, axis=1)
+
+        for_sale_shoe_detections = shoe_detections[~worn_shoe_mask]
+        
+        final_detections = sv.Detections.merge([people_detections, for_sale_shoe_detections])
+        
         enhanced_labels = []
-        for bbox, class_id in zip(detections.xyxy, detections.class_id):
+        for bbox, class_id in zip(final_detections.xyxy, final_detections.class_id):
             x1, y1, x2, y2 = map(int, bbox)
             cropped_image = frame[y1:y2, x1:x2]
             color_name = get_dominant_color(cropped_image)
-            
-            # Joriy klass nomini va uning o'zbekcha tarjimasini olish
             current_class_name_en = CLASSES[class_id]
             current_class_name_uz = UZBEK_TEXT["class_names"].get(current_class_name_en, current_class_name_en)
-            
             new_label = f"{current_class_name_uz} ({color_name})" if color_name else current_class_name_uz
             enhanced_labels.append(new_label)
 
-        annotated_frame = box_annotator.annotate(scene=frame.copy(), detections=detections)
-        annotated_frame = label_annotator.annotate(scene=annotated_frame, detections=detections, labels=enhanced_labels)
+        annotated_frame = box_annotator.annotate(scene=frame.copy(), detections=final_detections)
+        annotated_frame = label_annotator.annotate(scene=annotated_frame, detections=final_detections, labels=enhanced_labels)
         
         try:
             faces = RetinaFace.detect_faces(annotated_frame)
@@ -157,11 +158,11 @@ def main():
         except Exception as e:
             pass
         
-        # *** STATISTIKA HISOBLASH MANTIG'I YANGILANDI ***
-        men_count = sum(1 for cid in detections.class_id if CLASSES[cid] == "man")
-        women_count = sum(1 for cid in detections.class_id if CLASSES[cid] == "woman")
-        kids_count = sum(1 for cid in detections.class_id if CLASSES[cid] == "kid")
-        shoes_count = sum(1 for cid in detections.class_id if CLASSES[cid] == "shoes")
+        # *** STATISTIKA VA ALERT QISMI TO'LIQ QO'SHILDI ***
+        men_count = sum(1 for cid in final_detections.class_id if CLASSES[cid] == "man")
+        women_count = sum(1 for cid in final_detections.class_id if CLASSES[cid] == "woman")
+        kids_count = sum(1 for cid in final_detections.class_id if CLASSES[cid] == "kid")
+        shoes_count = sum(1 for cid in final_detections.class_id if CLASSES[cid] == "shoes")
         total_people_count = men_count + women_count + kids_count
         density = total_people_count / STORE_AREA_SQ_METERS
 
@@ -169,7 +170,6 @@ def main():
         if density >= DENSITY_THRESHOLDS["high"]: crowding_level = UZBEK_TEXT["high"]
         elif density >= DENSITY_THRESHOLDS["medium"]: crowding_level = UZBEK_TEXT["medium"]
 
-        # *** STATISTIKANI EKRANGA CHIQARISH YANGILANDI ***
         y_pos = 30
         stats = {
             "detected_total_people": total_people_count,
@@ -182,17 +182,19 @@ def main():
         }
         
         for key, value in stats.items():
-            text = UZBEK_TEXT[key].format(value)
-            cv2.putText(annotated_frame, text, (10, y_pos), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 0) , 2, cv2.LINE_AA)
+            text_format = UZBEK_TEXT[key]
+            text = text_format.format(value) if isinstance(value, int) else text_format.format(value)
+            if key == "density":
+                text = UZBEK_TEXT[key].format(value)
+            cv2.putText(annotated_frame, text, (10, y_pos), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 0), 2, cv2.LINE_AA)
             y_pos += 40
         
         zx1, zy1, zx2, zy2 = HIGH_DENSITY_ALERT_ZONE
         cv2.rectangle(annotated_frame, (zx1, zy1), (zx2, zy2), (0, 0, 255), 2)
         zone_people = 0
         
-        # *** HEATMAP UCHUN NUQTA YIG'ISH YANGILANDI ***
         people_classes = {"man", "woman", "kid"}
-        for i, (detection, class_id) in enumerate(zip(detections.xyxy, detections.class_id)):
+        for i, (detection, class_id) in enumerate(zip(final_detections.xyxy, final_detections.class_id)):
             if CLASSES[class_id] in people_classes:
                 center_x, center_y = (detection[0] + detection[2]) / 2, (detection[1] + detection[3]) / 2
                 heatmap_points.append((int(center_x), int(center_y)))
@@ -219,4 +221,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
