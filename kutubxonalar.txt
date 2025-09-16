@@ -1,3 +1,7 @@
+torch
+torchvision
+timm
+addict
 numpy
 opencv-python
 mediapipe

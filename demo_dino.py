@@ -35,8 +35,8 @@ UZBEK_TEXT = {
 # =================================================================================
 # SOZLAMALAR
 # =================================================================================
-GROUNDING_DINO_CONFIG_PATH = "/home/bekhzod/Desktop/VideoDetection/GroundingDINO/groundingdino/config/GroundingDINO_SwinT_OGC.py"
-GROUNDING_DINO_CHECKPOINT_PATH = "/home/bekhzod/Desktop/VideoDetection/GroundingDINO/weights/groundingdino_swint_ogc.pth"
+GROUNDING_DINO_CONFIG_PATH = "/home/bekhzod/Desktop/SpaceAnalyzer/GroundingDINO/groundingdino/config/GroundingDINO_SwinT_OGC.py"
+GROUNDING_DINO_CHECKPOINT_PATH = "/home/bekhzod/Desktop/SpaceAnalyzer/GroundingDINO/weights/groundingdino_swint_ogc.pth"
 CLASSES = ["man", "woman", "kid", "shoes"]
 DENSITY_THRESHOLDS = {"high": 0.5, "medium": 0.2}
 BOX_TRESHOLD = 0.2
