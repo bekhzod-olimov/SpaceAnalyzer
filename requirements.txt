@@ -6,7 +6,7 @@ tf-keras==2.16.0
 
 # --- NEW: Added for advanced features ---
 deepface
-colormath
+colormath>=3.0.0
 
 # Other script dependencies
 supervision==0.20.0

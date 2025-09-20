@@ -4,7 +4,7 @@
 # necessary dependencies with compatible versions to run the demo_dino.py script.
 
 # --- Configuration ---
-VENV_NAME="/home/bekhzod/envs/space"
+VENV_NAME="/home/bekhzod/envs/space_dino"
 PYTHON_EXECUTABLE="python3.11" # Change if you use a different python version, e.g., python3
 
 # --- Script Start ---

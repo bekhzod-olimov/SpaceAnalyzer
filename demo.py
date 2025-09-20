@@ -135,12 +135,12 @@ def create_dynamic_zones(shoe_detections, frame_width):
     if len(left_shoes) > 0:
         x1, y1 = np.min(left_shoes.xyxy[:, [0, 1]], axis=0) - ZONE_PADDING
         x2, y2 = np.max(left_shoes.xyxy[:, [2, 3]], axis=0) + ZONE_PADDING
-        zones["chap qator"] = {"coords": (int(x1), int(y1), int(x2), int(y2)), "color": (255, 165, 0)}
+        zones["chap qator rastasi"] = {"coords": (int(x1), int(y1), int(x2), int(y2)), "color": (255, 165, 0)}
 
     if len(right_shoes) > 0:
         x1, y1 = np.min(right_shoes.xyxy[:, [0, 1]], axis=0) - ZONE_PADDING
         x2, y2 = np.max(right_shoes.xyxy[:, [2, 3]], axis=0) + ZONE_PADDING
-        zones["o'ng qator"] = {"coords": (int(x1), int(y1), int(x2), int(y2)), "color": (0, 128, 255)}
+        zones["o'ng qator rastasi"] = {"coords": (int(x1), int(y1), int(x2), int(y2)), "color": (0, 128, 255)}
         
     return zones
 
@@ -315,7 +315,7 @@ def main():
         out.write(annotated_frame)
         
         display_frame = cv2.resize(annotated_frame, (1280, 720))
-        cv2.imshow("Space Analyzer - Press 'q' to quit", display_frame)
+        cv2.imshow("Oynani yopish uchun 'q' ni bosing", display_frame)
         if cv2.waitKey(1) & 0xFF == ord('q'):
             break
         
