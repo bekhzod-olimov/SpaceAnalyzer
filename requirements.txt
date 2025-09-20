@@ -1,0 +1,19 @@
+# TensorFlow and its specific dependencies
+tensorflow==2.16.2
+numpy==1.26.4
+opencv-contrib-python==4.8.1.78
+tf-keras==2.16.0
+
+# --- NEW: Added for advanced features ---
+deepface
+colormath
+
+# Other script dependencies
+supervision==0.20.0
+# retina-face is now installed as a dependency of deepface
+scikit-learn
+scipy
+addict
+yapf
+timm
+einops
