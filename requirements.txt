@@ -17,3 +17,6 @@ addict
 yapf
 timm
 einops
+transformers
+pycocotools
+
